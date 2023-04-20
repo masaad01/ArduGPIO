@@ -27,10 +27,6 @@ class Pin:
         self.__callback = callback
         self.__update_threshold = update_threshold
     
-    # def __del__(self):
-    #     if self.__async_task is not None and not (self.__async_task.done() or self.__async_task.cancelled()):
-    #         self.__async_task.cancel()
-    
     async def update(self, data: list[int, int, int, int]):
         #[pin_type, pin_number, pin_value, raw_time_stamp]
         self.__old_value = self.__value
@@ -41,7 +37,15 @@ class Pin:
             self.__callback(self)
     
     def set_async_task(self, task: Task):
-        self.__async_task = task
+        if self.__direction == IN:
+            self.__async_task = task
+        else:
+            raise ValueError("Cannot set async task for output pin; this is needed for input pins receiving data from the Arduino")
+    
+    def cancel_async_task(self):
+        if self.__async_task is not None:
+            if not (self.__async_task.done() or self.__async_task.cancelled()):
+                self.__async_task.cancel()
     
     # define getters
     @property

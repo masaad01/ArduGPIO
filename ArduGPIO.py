@@ -61,7 +61,11 @@ def __shutdown():
     It calls the shutdown function to stop the telemetrix loop gracefully, and then exits the program.
     """
     print("Telemetrix Shutting down.")
-    cleanup()
+    
+    tasks = asyncio.all_tasks(__loop)
+    for task in tasks:
+        task.cancel()
+    
     if __loop is not None:
         __loop.stop()
         while __loop.is_running():
@@ -69,6 +73,7 @@ def __shutdown():
     if __board is not None:
         __loop.run_until_complete(__board.shutdown())
         __loop_thread.join()
+        __loop.close()
 
 # Define ArduGPIO pin setup functions
 
@@ -284,14 +289,22 @@ def cleanup(channel=None):
     global __active_pins
     if channel is None:
         __loop.create_task(__board.disable_all_reporting())
+        for pin in __active_pins:
+            pin.cancel_async_task()
+        
         __active_pins = []
     else:
         pin = get_pin(channel)
+                
+        if pin.direction == IN:
+            if pin.type == DIGITAL:
+                __loop.create_task(__board.disable_digital_reporting(pin.channel))
+            elif pin.type == ANALOG:
+                __loop.create_task(__board.disable_analog_reporting(pin.channel))
+                
+        pin.cancel_async_task()
         __active_pins.remove(pin)
-        if pin.type == DIGITAL and pin.direction == IN:
-            __loop.create_task(__board.disable_digital_reporting(pin.channel))
-        elif pin.type == ANALOG and pin.direction == IN:
-            __loop.create_task(__board.disable_analog_reporting(pin.channel))
+
 
 def setwarnings(flag):
     raise NotImplementedError("Mock method: setwarnings")
@@ -321,9 +334,8 @@ def wait_for_edge(channel, edge):
     raise NotImplementedError("Mock method: wait_for_edge")
 
 
-# start the loop
-atexit.register(__shutdown)
-
+# start the loop thread and register the shutdown function
 if __name__ != "__main__":
     __start_loop()
+    atexit.register(__shutdown)
 

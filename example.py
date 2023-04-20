@@ -1,4 +1,3 @@
-from time import sleep
 import ArduGPIO as GPIO
 import time
 
@@ -19,6 +18,5 @@ for i in range(2):
     time.sleep(0.5)
 
 
-GPIO.cleanup()
 
 print("DONE")
